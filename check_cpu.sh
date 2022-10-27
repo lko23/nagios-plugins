@@ -34,7 +34,7 @@ ST_WR=1
 ST_CR=2
 ST_UK=3
 
-interval=5
+interval=2
 
 print_version() {
   printf "%s %s\n" "$VERSION" "$AUTHOR"
@@ -62,7 +62,7 @@ Note : [VALUE] must be an integer.
 END
 }
 
-if [ $# -ne 10 ]
+if [ $# -ne 8 ]
 then
   help;
   exit 3;
@@ -91,7 +91,7 @@ get_cpuvals() {
   nTimes=$1
   SSH_COMMAND=$()
   for ((x=0;x<=${nTimes};x++)); do
-    ssh -l ${USERNAME} ${HOSTNAME} -C ${COMMAND}  > ${TEMP_FILE}
+    ssh -q -l ${USERNAME} ${HOSTNAME} -C ${COMMAND}  > ${TEMP_FILE}
     TEMP_VAR=();
     for ((y=2;y<=8;y++)); do
       TEMP_VAR+=( $(grep -m1 '^cpu' ${TEMP_FILE} |awk -v var="$y" '{print $var}') );
