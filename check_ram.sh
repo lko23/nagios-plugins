@@ -69,55 +69,46 @@ do
         esac
 done
 
+SSH_COMMAND="`ssh -q -l $USERNAME $HOSTNAME -C $COMMAND2`"
+echo "$SSH_COMMAND"  > $TEMP_FILE
 
-SSH_COMMAND="`ssh -l $USERNAME $HOSTNAME -C $COMMAND1`"
- echo "$SSH_COMMAND"  > $TEMP_FILE.1 
-SSH_COMMAND="`ssh -l $USERNAME $HOSTNAME -C $COMMAND2`"
- echo "$SSH_COMMAND"  > $TEMP_FILE.2
+swapTotal_m=`grep Total $TEMP_FILE  | sed -r 's/\ +/\ /g' | cut -d \  -f 2`
+swapUsed_m=`grep Total $TEMP_FILE  | sed -r 's/\ +/\ /g' | cut -d \  -f 3`
+memTotal_m=`grep Mem $TEMP_FILE  | sed -r 's/\ +/\ /g' | cut -d \  -f 2`
+memUsed_m=`grep Mem $TEMP_FILE  | sed -r 's/\ +/\ /g' | cut -d \  -f 3`
 
- swapTotal_b=`grep Swap $TEMP_FILE.1  | sed -r 's/\ +/\ /g' | cut -d \  -f 2`
- swapFree_b=`grep Swap $TEMP_FILE.1  | sed -r 's/\ +/\ /g' | cut -d \  -f 4`
- memTotal_b=`grep Mem $TEMP_FILE.1  | sed -r 's/\ +/\ /g' | cut -d \  -f 2`
- memFree_b=`grep Mem $TEMP_FILE.1  | sed -r 's/\ +/\ /g' | cut -d \  -f 4`
- memBuffer_b=`grep Mem $TEMP_FILE.1  | sed -r 's/\ +/\ /g' | cut -d \  -f 6`
- memCache_b=`grep Mem $TEMP_FILE.1  | sed -r 's/\ +/\ /g' | cut -d \  -f 7`
+if [ "$swapTotal_m" -gt 0 ]; then
+ swapUsedPrc=$((($swapUsed_m*100)/$swapTotal_m))
+else
+ wapUsedPrc=0
+fi
 
- swapTotal_m=`grep Swap $TEMP_FILE.2  | sed -r 's/\ +/\ /g' | cut -d \  -f 2`
- swapFree_m=`grep Swap $TEMP_FILE.2  | sed -r 's/\ +/\ /g' | cut -d \  -f 4` 
- memTotal_m=`grep Mem $TEMP_FILE.2  | sed -r 's/\ +/\ /g' | cut -d \  -f 2`
- memFree_m=`grep Mem $TEMP_FILE.2  | sed -r 's/\ +/\ /g' | cut -d \  -f 4`
- memBuffer_m=`grep Mem $TEMP_FILE.2  | sed -r 's/\ +/\ /g' | cut -d \  -f 6`
- memCache_m=`grep Mem $TEMP_FILE.2  | sed -r 's/\ +/\ /g' | cut -d \  -f 7`
+if [ "$memTotal_m" -gt 0 ]; then
+ memUsedPrc=$((($memUsed_m*100)/$memTotal_m))
+else
+ memUsedPrc=0
+fi
 
- swapUsed_b=$(($swapTotal_b-$swapFree_b))
- memUsed_b=$(($memTotal_b-$memFree_b-$memBuffer_b-$memCache_b-$swapUsed_b))
- swapUsed_m=$(($swapTotal_m-$swapFree_m))
- memUsed_m=$(($memTotal_m-$memFree_m-$memBuffer_m-$memCache_m-$swapUsed_m))
+  swapUsedWarn=$((($swapTotal_m/100)*$warn))
+  swapUsedCrit=$((($swapTotal_m/100)*$crit))
 
- swapUsedPrc=$((($swapUsed_b*100)/$swapTotal_b))
- memUsedPrc=$((($memUsed_b*100)/$memTotal_b))
- 
-  swapUsedWarn=$((($swapTotal_b/100)*$warn))
-  swapUsedCrit=$((($swapTotal_b/100)*$crit))
-  
-  memUsedWarn=$((($memTotal_b/100)*$warn))
-  memUsedCrit=$((($memTotal_b/100)*$crit))
+  memUsedWarn=$((($memTotal_m/100)*$warn))
+  memUsedCrit=$((($memTotal_m/100)*$crit))
 
-rm $TEMP_FILE.1 $TEMP_FILE.2
-
+rm $TEMP_FILE
 
 #Memory usage: 937.71MiB (93.55%) of 1002.40MiB (warning threshold is set to 900MiB), Application memory usage: 210.57MiB (22.11%) of 952.28MiB, Cache usage: 688.96MiB (68.73%) of 1002.40MiB (critical threshold is set to 500MiB), Swap usage: 0.00MiB (0.00%) of 894.99MiB | MemUsed=983260200.96B;943718400;1048576000;0;1051095040 AppMemUsed=220798648.32B;838860800;943718400;0;998540288 CacheUsed=722426920.96B;419430400;524288000;0;1051095040 SwapUsed=0B;734003200;838860800;0;938467328 
 #${perf[@]};$WARN;$CRIT;0;;
-data="Memory usage: $memUsed_m MB ($memUsedPrc%) of $memTotal_m MB, Swap usage: $swapUsed_m MB ($swapUsedPrc%) of $swapTotal_m MB"
-perf="USED=$memUsed_b;$memUsedWarn;$memUsedCrit;0;$memTotal_b; SWAP=$swapUsed_m;$swapUsedWarn;$swapUsedCrit;0;$swapTotal_b;"
+data="Virtual Memory: $swapUsed_m MB ($swapUsedPrc%) of $swapTotal_m MB - Physical Memory: $memUsed_m MB ($memUsedPrc%) of $memTotal_m MB, Virtual Memory: $swapUsed_m MB ($swapUsedPrc%) of $swapTotal_m MB"
+perf="'Virtual_Memory'=${swapUsed_m}MB;${swapUsedWarn};${swapUsedCrit};0;${swapTotal_m} 'Physical_Memory'=${memUsed_m}MB;;;0;${memTotal_m}"
 
-if [ "$memUsedPrc" -ge "$crit" ]; then
-    echo "Memory: CRITICAL $data | $perf"
+if [ "$swapUsedPrc" -ge "$crit" ]; then
+    echo "CRITICAL: $data | $perf"
     $(exit 2)
-  elif [ "$memUsedPrc" -ge "$warn" ]; then
-    echo "Memory: WARNING $data | $perf"
+  elif [ "$swapUsedPrc" -ge "$warn" ]; then
+    echo "WARNING: $data | $perf"
     $(exit 1)
   else
-    echo "Memory: OK $data | $perf"
+    echo "OK: $data | $perf"
     $(exit 0)
-fi 
+fi
