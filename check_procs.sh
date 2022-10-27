@@ -43,9 +43,9 @@ Usage :
         -h              Help
         -l [STRING]     Remote user
         -H [STRING]     Host name
-        -p [VALUE]      Name of process to check
-        -w [VALUE]      Warning Threshold
-        -c [VALUE]      Critical Threshold
+        -p [VALUE]      Name of process to check, multiple processes 'proc1\|proc2'
+        -w [VALUE]      Warning Threshold (higher)
+        -c [VALUE]      Critical Threshold (lower)
 
         ----------------------------------
 Note : [VALUE] must be an integer.
@@ -64,28 +64,30 @@ do
         l) USERNAME="$OPTARG" ;;
         H) HOSTNAME="$OPTARG" ;;
         p) proc="$OPTARG" ;;
-        w) min="$OPTARG" ;;
-        c) max="$OPTARG" ;;
+        w) hi="$OPTARG" ;;
+        c) lo="$OPTARG" ;;
         *) help ;;
         esac
 done
 
-lines=`ssh -l $USERNAME $HOSTNAME -C "ps -ef | grep $proc | grep -v grep | grep -v check_proc | wc -l"`
-perf_data="$proc=$lines;$min;$max;;;"
+lines=`ssh -q -l $USERNAME $HOSTNAME -C "ps -ef | grep '$proc' | grep -v grep | grep -v check_proc | wc -l"`
+perf_data="$proc=$lines;$hi;$lo"
 
 if [ -n "$lines" ]; then
         if [ "$lines" -eq "0" ]; then
-                echo "Warning: Not enough processes ($lines/$min) | $perf_data"
-                exit 1
-        elif [ "$lines" -lt "$min" ]; then
-                echo "OK: $lines processes running (min=$min, max=$max) | $perf_data"
-                exit 0
-         elif [ "$lines" -eq "$min" -o "$lines" -gt "$min" -a "$lines" -lt "$max" ]; then
-                echo "Warning: Too much processes ($lines/$max) | $perf_data"
-                exit 1
-         elif [ "$lines" -eq "$max" -o "$lines" -gt "$max" ]; then
-                echo "Critical: Too much processes ($lines/$max) | $perf_data"
+                #echo "Warning: Not enough processes ($lines/$min) | $perf_data"
+                echo "Critical: No process found matching $proc ($lines/$lo/$hi) | $perf_data"
+                #exit 1
                 exit 2
+        elif  [ "$lines" -le "$lo" ]; then
+                echo "Critical: Not enough processes found matching $proc ($lines/$lo/$hi) | $perf_data"
+                exit 2
+        elif  [ "$lines" -ge "$hi" ]; then
+                echo "Warning: Too much process found matching $proc ($lines/$lo/$hi) | $perf_data"
+                exit 1
+        elif  [ "$lines" -gt "$lo" -a "$lines" -lt "$hi" ]; then
+                echo "OK: $lines process(es) found matching $proc ($lines/$lo/$hi) | $perf_data"
+                exit 0
         fi
  else
         echo "Unknown error"
