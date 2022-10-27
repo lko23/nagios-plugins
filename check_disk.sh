@@ -83,9 +83,17 @@ do
   esac
 done
 
+if [ ${#FSTYPE} -ge 1 ]; then
+COMMAND="/bin/df $FSTYPE"
+fi
+
 get_data () {
   ## Sending the ssh request command and store the result into local log file
-  ssh -l ${USERNAME} ${HOSTNAME} -C ${COMMAND} > ${TEMP_FILE}.tmp
+  if [ ${#GREP} -ge 1 ]; then
+        ssh -q -l ${USERNAME} ${HOSTNAME} -C ${COMMAND} | grep ${GREP} > ${TEMP_FILE}.tmp
+  else
+        ssh -q -l ${USERNAME} ${HOSTNAME} -C ${COMMAND} > ${TEMP_FILE}.tmp
+  fi
   cat ${TEMP_FILE}.tmp | grep -v Used | grep -v '0 0 0'|grep -ve '- - -' > ${TEMP_FILE}
   EQP_FS=$(cat ${TEMP_FILE} | grep -v Used |grep -v '0 0 0'|grep -ve '- - -' | wc -l)  # determine how many FS are in the server
 }
@@ -105,7 +113,7 @@ process_data (){
 
   done
   exec 3<&0
-  #rm $TEMP_FILE.tmp $TEMP_FILE
+  rm $TEMP_FILE.tmp $TEMP_FILE
 }
 
 get_data
@@ -126,24 +134,24 @@ done
 
 ## Set the data to show in the nagios service status
 for (( i=1; i<=$EQP_FS; i++ )); do
-  DATA[$i]="${FSNAME[$i]} ${PERCENT[$i]}% of ${FULL[$i]},"
-  perf[$i]="${FSNAME[$i]}=${PERCENT[$i]}%;${WARN};${CRIT};0;;"
+  DATA[$i]="${FSNAME[$i]} ${PERCENT[$i]}% of ${FULL[$i]}"
+  perf[$i]="${FSNAME[$i]}=${PERCENT[$i]}%;${WARN};${CRIT};"
 done
 
 ## Just validate and adjust the nagios output
 if [ "$ok" -eq "$EQP_FS" -a "$warn" -eq 0 -a "$crit" -eq 0 ]; then
-  echo "OK. DISK STATS: ${DATA[@]}"
+  echo "OK. DISK STATS: ${DATA[@]} | ${perf[@]}"
   exit 0
 elif [ "$warn" -gt 0 -a "$crit" -eq 0 ]; then
-  echo "WARNING. DISK STATS: ${DATA[@]}_ Warning ${WARN_DISKS[@]}| ${perf[@]}"
+  echo "WARNING. DISK STATS: ${DATA[@]}_ Warning ${WARN_DISKS[@]} | ${perf[@]}"
   exit 1
 elif [ "$crit" -gt 0 ]; then
   #Validate if the Warning array is empty if so remove the Warning leyend
   if [ ${#WARN_DISKS[@]} -eq 0 ]; then
-    echo "CRITICAL. DISK STATS: ${DATA[@]}_ Critical ${CRIT_DISKS[@]}| ${perf[@]}"
+    echo "CRITICAL. DISK STATS: ${DATA[@]}_ Critical ${CRIT_DISKS[@]} | ${perf[@]}"
     exit 2
   else
-    echo "CRITICAL. DISK STATS: ${DATA[@]}_ Warning ${WARN_DISKS[@]}_ Critical ${CRIT_DISKS[@]}| ${perf[@]}"
+    echo "CRITICAL. DISK STATS: ${DATA[@]}_ Warning ${WARN_DISKS[@]}_ Critical ${CRIT_DISKS[@]} | ${perf[@]}"
     exit 2
   fi
 else
